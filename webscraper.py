@@ -3,6 +3,9 @@ import requests
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+import smtplib, ssl
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 engine = create_engine('postgres+psycopg2://carly:Indy4running@localhost:5432/kites', echo=True)
 Base = declarative_base()
@@ -46,17 +49,60 @@ def return_next_page(page):
     return return_next_page(page + 1)
 
 all_kites = return_next_page(1)
-saved_kites = [kite.id for kite in session.query(Kite.id)]
+# saved_kites = [kite.id for kite in session.query(Kite.id)]
 new_kites = []
 
 for kite in all_kites:
-    sql_kite = Kite(id=kite[0], title=kite[1], price=kite[2], link=kite[3])
-    if sql_kite.id not in saved_kites:
-        session.add(sql_kite)
-        new_kites.append(kite)
+    kite = Kite(id=kite[0], title=kite[1], price=kite[2], link=kite[3])
+    # if kite.id not in saved_kites:
+    # session.add(kite)
+    new_kites.append(kite)
 
-session.commit()
-print(new_kites)
-# iterate through all kites
-# if kite is not in DB, add kite to DB and add it to list of kites to be emailed out
-# send email with all kites
+# session.commit()
+
+port = 465
+password = open("password.txt").read()
+context = ssl.create_default_context()
+sender_email = "newkitealert@gmail.com"
+receiver_email = "carlyschaaf@berkeley.edu"
+
+message = MIMEMultipart("alternative")
+message["Subject"] = "multipart test"
+message["From"] = sender_email
+message["To"] = receiver_email
+
+# text = """\
+# New kites are in!
+
+# """
+kite_list_items = []
+
+for kite in new_kites:
+    kite_list_items.append("""\
+        <ul>
+            <li><a href={}>{}</a> - ${}</li>
+            <br>
+        </ul>
+    """.format(kite.link, kite.title, kite.price))
+
+html = """\
+<html>
+  <body>
+    <p>New kites are in!<br>
+        <ul>
+        {}
+        </ul>
+    </p>
+  </body>
+</html>
+""".format("".join(kite_list_items))
+
+# part1 = MIMEText(text, "plain")
+part2 = MIMEText(html, "html")
+
+# message.attach(part1)
+message.attach(part2)
+
+with smtplib.SMTP_SSL("smtp.gmail.com", port, context=context) as server:
+    server.login(sender_email, password)
+    server.sendmail(sender_email, receiver_email, message.as_string())
