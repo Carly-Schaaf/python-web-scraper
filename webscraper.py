@@ -38,7 +38,7 @@ def return_next_page(page):
         title = kite.find_next('a').text[2:-2]
         price = float(kite.find_next('span').text[1:])
         link = kite.find_next('a')['href']
-        id = link[-7:-1]
+        id = int(link[-6:-1])
 
         formatted_kite = (id, title, price, link)
         kites.append(formatted_kite) 
@@ -46,11 +46,17 @@ def return_next_page(page):
     return return_next_page(page + 1)
 
 all_kites = return_next_page(1)
+saved_kites = [kite.id for kite in session.query(Kite.id)]
+new_kites = []
 
 for kite in all_kites:
-    print(kite)
-    kite = Kite(title=kite[0], price=kite[1], link=kite[2], id=kite[3])
-    session.add(kite)
+    sql_kite = Kite(id=kite[0], title=kite[1], price=kite[2], link=kite[3])
+    if sql_kite.id not in saved_kites:
+        session.add(sql_kite)
+        new_kites.append(kite)
 
 session.commit()
-
+print(new_kites)
+# iterate through all kites
+# if kite is not in DB, add kite to DB and add it to list of kites to be emailed out
+# send email with all kites
